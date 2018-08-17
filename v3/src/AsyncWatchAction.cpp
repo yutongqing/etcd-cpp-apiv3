@@ -27,8 +27,25 @@ etcdv3::AsyncWatchAction::AsyncWatchAction(etcdv3::ActionParameters param)
   }
 
   watch_req.mutable_create_request()->CopyFrom(watch_create_req);
-  stream->Write(watch_req, (void*)"write");
-  stream->Read(&reply, (void*)this);
+  
+  /*********************************
+   * to solve grpc crash
+   *********************************/
+  void* got_tag;
+  bool ok = false;
+  if (cq_.Next(&got_tag, &ok) && ok && got_tag == (void*)"create")
+  {
+     stream->Write(watch_req, (void*)"write");
+     ok = false;
+     if (cq_.Next(&got_tag, &ok) && ok && got_tag == (void*)"write")
+        stream->Read(&reply, (void*)this);
+     else
+        cq_.Shutdown();
+  }
+  else
+  {
+     cq_.Shutdown();
+  }
 }
 
 
@@ -39,7 +56,7 @@ void etcdv3::AsyncWatchAction::waitForResponse()
   
   while(cq_.Next(&got_tag, &ok))
   {
-    if(ok == false || (got_tag == (void*)"writes done"))
+    if(ok == false)
     {
       break;
     }
@@ -61,31 +78,49 @@ void etcdv3::AsyncWatchAction::CancelWatch()
 {
   if(isCancelled == false)
   {
-    stream->WritesDone((void*)"writes done");
+    //check if cq_ is ok
+    isCancelled = true;
+    void* got_tag;
+    bool ok = false;
+    gpr_timespec deadline;
+    deadline.clock_type = GPR_TIMESPAN;
+    deadline.tv_sec = 0;
+    deadline.tv_nsec = 10000000;
+
+    if(cq_.AsyncNext(&got_tag, &ok, deadline) != CompletionQueue::SHUTDOWN)
+       stream->WritesDone((void*)"writes done");
   }
 }
 
-void etcdv3::AsyncWatchAction::waitForResponse(std::function<void(etcd::Response)> callback) 
+void etcdv3::AsyncWatchAction::waitForResponse(std::function<bool(etcd::Response)> callback) 
+//void etcdv3::AsyncWatchAction::waitForResponse(std::function<void(etcd::Response)> callback) 
 {
   void* got_tag;
   bool ok = false;    
 
   while(cq_.Next(&got_tag, &ok))
   {
-    if(ok == false)
+    if(ok == false && got_tag == (void*)this)
     {
+      cq_.Shutdown();
       break;
     }
     if(got_tag == (void*)"writes done")
     {
       isCancelled = true;
+      //when write done, break watch
+      cq_.Shutdown();
+      break;
     }
     else if(got_tag == (void*)this) // read tag
     {
       if(reply.events_size())
       {
         auto resp = ParseResponse();
-        callback(resp); 
+        if(callback(resp))
+        {
+            break;
+        }
       }
       stream->Read(&reply, (void*)this);
     }     

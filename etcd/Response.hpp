@@ -35,7 +35,11 @@ namespace etcd
 
         auto v3resp = call->ParseResponse();
           
-        resp = etcd::Response(v3resp);    
+        resp = etcd::Response(v3resp);
+        if(resp.error_code() == 14 || resp.error_code() == 4)//14 means connect disconnect, 4 means timeout
+        {
+            throw std::runtime_error(resp.error_message());
+        } 
 
         return resp;
       });

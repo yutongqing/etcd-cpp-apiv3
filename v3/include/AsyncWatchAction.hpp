@@ -21,7 +21,7 @@ namespace etcdv3
       AsyncWatchAction(etcdv3::ActionParameters param);
       AsyncWatchResponse ParseResponse();
       void waitForResponse();
-      void waitForResponse(std::function<void(etcd::Response)> callback); 
+      void waitForResponse(std::function<bool(etcd::Response)> callback); 
       void CancelWatch();
       void WatchReq(std::string const & key);
     private:

@@ -16,12 +16,12 @@ namespace etcd
   class Watcher
   {
   public:
-    Watcher(std::string const & etcd_url, std::string const & key, std::function<void(Response)> callback);
+    Watcher(std::string const & etcd_url, std::string const & key, std::function<bool(Response)> callback);
     void Cancel();
     ~Watcher();
 
   protected:
-    void doWatch(std::string const & key, std::function<void(Response)> callback);
+    void doWatch(std::string const & key, std::function<bool(Response)> callback);
 
     int index;
     std::function<void(Response)> callback;

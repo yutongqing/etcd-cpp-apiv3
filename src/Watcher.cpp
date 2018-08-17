@@ -1,6 +1,6 @@
 #include "etcd/Watcher.hpp"
 
-etcd::Watcher::Watcher(std::string const & address, std::string const & key, std::function<void(Response)> callback)
+etcd::Watcher::Watcher(std::string const & address, std::string const & key, std::function<bool(Response)> callback)
 {
   std::string stripped_address(address);
   std::string substr("http://");
@@ -28,7 +28,7 @@ void etcd::Watcher::Cancel()
   currentTask.wait();
 }
 
-void etcd::Watcher::doWatch(std::string const & key, std::function<void(Response)> callback)
+void etcd::Watcher::doWatch(std::string const & key, std::function<bool(Response)> callback)
 {
   etcdv3::ActionParameters params;
   params.key.assign(key);
